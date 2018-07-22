@@ -30,7 +30,7 @@ def dualfish2equirectangular(v_p, v_t, input_h):
     R = int(input_h/2)
     theta = np.radians(v_t)
     phi = np.radians(v_p)
-    
+
     Px = np.cos(phi)*np.cos(theta)
     Py = np.cos(phi)*np.sin(theta)
     Pz = np.sin(phi)
@@ -38,26 +38,26 @@ def dualfish2equirectangular(v_p, v_t, input_h):
     r = R*np.arccos(Px/(np.sqrt(Px**2+Py**2+Pz**2)))/aperture
     Px = Px - 1
     th = np.arctan2(Pz, Px)
-    
+
     Px[theta>0] = -Px[theta>0]
-    
+
     x = (Py/np.sqrt(Py**2+Pz**2))*r
     y = -(Pz/np.sqrt(Py**2+Pz**2))*r
-    
+
     x += R
     y += R
     mask = np.zeros_like(v_p)
-    
+
     mask[x<0] = 1
     mask[x>=R*2] = 1
     mask[y<0] = 1
-    mask[y>=R*2] = 1    
+    mask[y>=R*2] = 1
     mask[np.isnan(x)] = 1
     mask[np.isnan(y)] = 1
-    
+
     y = y.astype(np.int)
     x = x.astype(np.int)
-    
+
     y[mask==1] = 0
     x[mask==1] = 0
     return y, x
@@ -67,10 +67,10 @@ def dualfish2equirectangular(v_p, v_t, input_h):
     aperture = np.radians(105)
 
     R = int(input_h/2)
-    
+
     theta = np.radians(v_t)
     phi = np.radians(v_p)
-    
+
     Px = np.cos(phi)*np.cos(theta)
     Py = np.cos(phi)*np.sin(theta)
     Pz = np.sin(phi)
@@ -79,25 +79,25 @@ def dualfish2equirectangular(v_p, v_t, input_h):
     Px = Px - 1
     th = np.arctan2(Pz, Px)
     Px[theta>0] = -Px[theta>0]
-    
+
     x = (Py/np.sqrt(Py**2+Pz**2))*r
     y = -(Pz/np.sqrt(Py**2+Pz**2))*r
-    
+
     x += R
     y += R
-    
+
     mask = np.zeros_like(v_p)
-    
+
     mask[x<0] = 1
     mask[x>=R*2] = 1
     mask[y<0] = 1
-    mask[y>=R*2] = 1    
+    mask[y>=R*2] = 1
     mask[np.isnan(x)] = 1
     mask[np.isnan(y)] = 1
-    
+
     y = y.astype(np.int)
     x = x.astype(np.int)
-    
+
     y[mask==1] = 0
     x[mask==1] = 0
     return y, x
@@ -132,7 +132,7 @@ class Setup_extract_omni_image():
         self.f2e_size = f2e_size
         self.view_angle = view_angle
         self.elevation_angle = elevation_angle
-        
+
         theta_a = math.radians(self.view_angle)
         phi_a = math.radians(self.view_angle)
 
@@ -153,14 +153,14 @@ class Setup_extract_omni_image():
                                  [np.radians(-125),np.radians(self.elevation_angle)]])
 
         self.cpA = [ CameraPrm(
-                     camera_angle=camerasA[t], 
-                     image_plane_size=(self.extract_outputsize, self.extract_outputsize), 
+                     camera_angle=camerasA[t],
+                     image_plane_size=(self.extract_outputsize, self.extract_outputsize),
                      view_angle=(theta_a, phi_a)
                      ) for t in range(camerasA.shape[0]) ]
 
         self.cpB = [ CameraPrm(
-                    camera_angle=camerasB[t], 
-                    image_plane_size=(self.extract_outputsize, self.extract_outputsize), 
+                    camera_angle=camerasB[t],
+                    image_plane_size=(self.extract_outputsize, self.extract_outputsize),
                     view_angle=(theta_a, phi_a)
                     ) for t in range(camerasB.shape[0]) ]
 
@@ -171,23 +171,23 @@ class Setup_extract_omni_image():
         y, x = np.meshgrid(np.arange(h),np.arange(w))
         v_t = -180 + 360*x/(w)
         v_p = 90 - 180*y/(h-1)
-        
+
         v_t = v_t.T
         v_p = v_p.T
-        
+
         odi_angles = np.empty((h, w, 2))
-        
+
         odi_angles[:, :, 0] = v_t
         odi_angles[:, :, 1] = v_p
-        
+
         imcA = OmniImage(odi_angles)
         impA = [ imcA.extract(self.cpA[num]) for num in range(len(self.cpA)) ]
         impA = np.array(impA)
-    
+
         imcB = OmniImage(odi_angles)
         impB = [ imcB.extract(self.cpB[num]) for num in range(len(self.cpB)) ]
         impB = np.array(impB)
-    
+
         angles[0] = impA[0]
         angles[1] = impA[1]
         angles[2] = impA[2]
@@ -332,7 +332,7 @@ class OmniImage:
 
 def extract_omni_image(np_image, setupper):
     # ちょっとだけ改良
-    omni_im = np.empty((setupper.extract_num+2, setupper.extract_outputsize,
+    omni_im = np.empty((setupper.extract_num, setupper.extract_outputsize,
                         setupper.extract_outputsize, 3)).astype(np.uint8)
 
     odiA, odiB = f2e(np_image, setupper)
