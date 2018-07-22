@@ -212,18 +212,16 @@ def detect(frames):
     if len(output_person) != 0:
         max_score_index = output_person[:, 5].argmax()
         img_num = int(output_person[max_score_index][0])
-        c1 = tuple(output_person[max_score_index][1:3])
-        c2 = tuple(output_person[max_score_index][3:5])
+        c1 = tuple(output_person[max_score_index][1:3]) #upper left
+        c2 = tuple(output_person[max_score_index][3:5]) #lower right
         max_score = output_person[max_score_index][5]
-        center_x = int(c2[0] - c1[0])
-        print(img_num, center_x, max_score)
     else:
         print("No human was detections")
         return None, None, None
 
     torch.cuda.empty_cache()
 
-    return img_num, center_x, max_score
+    return img_num, c1, c2, max_score
 
 '''
 /yolov3
