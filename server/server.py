@@ -41,9 +41,12 @@ class ReturnAngleOfPersonAPI:
         # Divide the omni pictures into multiple frames
         frames = omni.extract_omni_image(omniData, omniSetupper)
         base = time.time()
-        img_num, center_x, max_score = api.detect(frames)
+        img_num, c1, c2, max_score = api.detect(frames)
         if img_num is not None:
-            angles = maps[img_num][200, center_x][0]
+            center_x = int(c2[0] - c1[0])
+            center_y = int(c2[1] - c1[1])
+            print(img_num, center_y, center_x, max_score)
+            angles = maps[img_num][center_y, center_x][0]
         print("angle", angles)
         print(time.time() - base)
 
