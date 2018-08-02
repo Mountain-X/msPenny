@@ -152,8 +152,8 @@ class saliencyPredictor(object):
 
 def get_f2e_npz(h, input_h):
     """
-    魚眼レンズ画像から正距円筒図法への変換マップを保存する。
-    正距円筒図法の画素毎に、魚眼レンズ画像のどの画素をとってmくれば良いかを持っておく。
+    魚眼レンズ画像から正距円筒図法への変換マップを保存する。セットアップ時にnpzファイルがなければ実行する。
+    正距円筒図法の画素毎に、魚眼レンズ画像のどの画素をとってくれば良いかを持っておく。
 
     また、その逆の変換マップも保存する。
     魚眼レンズ画像の画素毎に、正距円筒図法のどの画素をとってくれば良いかを持っておく。
@@ -178,16 +178,11 @@ def get_f2e_npz(h, input_h):
     e2f_mapA = np.ones((input_h, input_w, 2)).astype(np.int)*(-1)
     e2f_mapB = np.ones((input_h, input_w, 2)).astype(np.int)*(-1)
 
-#     e2f_mapA[f_y, f_x, 0], e2f_mapA[f_y, f_x, 1] = mapping_e2f(f_y, f_x, h)
-#     e2f_mapA = rnd(e2f_mapA)
-
 
     e2f_mapA[f2e_mapA[e_y, e_x, 0], f2e_mapA[e_y, e_x, 1], 0] = e_y
     e2f_mapA[f2e_mapA[e_y, e_x, 0], f2e_mapA[e_y, e_x, 1], 1] = e_x
     e2f_mapB[f2e_mapB[e_y, e_x, 0], f2e_mapB[e_y, e_x, 1], 0] = e_y
     e2f_mapB[f2e_mapB[e_y, e_x, 0], f2e_mapB[e_y, e_x, 1], 1] = e_x
-
-
 
     np.savez('f2e_'+str(input_h)+'_'+str(h)+'.npz', A = f2e_mapA, B = f2e_mapB)
     np.savez('e2f_'+str(input_h)+'_'+str(h)+'.npz', A = e2f_mapA, B = e2f_mapB)
@@ -242,26 +237,8 @@ def mapping_f2e(v_p, v_t, input_h):
 
 # def mapping_e2f(f_x, f_y,f_h):
 #逆の計算は未完成
-#     f_w = f_h*2
-
-#     aperture = np.radians(105)
-#     r = np.sqrt(f_x**2 + f_y**2)
-#     phi = r*aperture /2
-#     theta = np.arctan2(f_y, f_x)
-
-#     Px = r*np.sin(phi)*np.cos(theta)
-#     Py = r*np.sin(phi)*np.sin(theta)
-#     Pz = r*np.cos(phi)
-
-#     longitude = np.arctan2(Py, Px)
-#     latitude = np.arctan2(Pz, np.sqrt(Px**2 + Py**2))
-
-#     x = longitude / np.pi
-#     y = 2*latitude / np.pi
-
-#     x = (x+1)/2*f_w
-#     y = f_h - (y+1)/2*f_h
-
+#埋め込んだあとの画素が飛び飛びにならないためにはこれを作成し、roundするのが良い。
+#現在はget_f2e_npzによるマップを逆向きに使用している。
 #     return y, x
 
 
@@ -292,8 +269,8 @@ def e2f(equirectangularImages, setupper):
     setupper : Setup_extract_omni_imageのインスタンス
     """
 
-    print(setupper.f_h)
-    print(setupper.f_w)
+
+
     dualFishEyeImageA = np.zeros((setupper.f_h, setupper.f_w))
     dualFishEyeImageA = equirectangularImages [0][setupper.e2f_mapA[:,:,0] , setupper.e2f_mapA [:,:,1]]
     dualFishEyeImageA[:, int(setupper.f_w/2)-1:-1] = equirectangularImages [1][setupper.e2f_mapB[:,:,0], setupper.e2f_mapB[:,:,1] ][:, 0:int(setupper.f_w/2)]
@@ -304,12 +281,12 @@ def e2f(equirectangularImages, setupper):
 class Setup_extract_omni_image():
 
     def __init__(self, extract_num = 6, extract_outputsize = 400,
-                 f2e_size = 1000, view_angle = 90, elevation_angle = 45):
+                 f2e_size = 1000, f_h = 736, view_angle = 90, elevation_angle = 45):
         self.extract_num = extract_num
         self.extract_outputsize = extract_outputsize
         self.e_h = f2e_size
         self.e_w = self.e_h*2
-        self.f_h = 736
+        self.f_h = f_h
         self.f_w = self.f_h*2
         self.view_angle = view_angle
         self.elevation_angle = elevation_angle
@@ -360,6 +337,7 @@ class Setup_extract_omni_image():
         self.e2f_mapA = e2f_map['A']
         self.e2f_mapB = e2f_map['B']
 
+        #顕著性マップをカラー（ヒートマップ）化するときに、背景を消せるようにマスクを用意する。generate_inv_extract_mask.pyを使用して作成する。
         self.mask = np.load('mask'+str(self.elevation_angle)+'_'+str(self.f_h)+'.npz')['mask']
 
     def get_angles(self):
@@ -624,14 +602,20 @@ def inverse_extract_omni_image(planarImages, originalDualFishEyeImage, setupper,
     overlaid_weight1 : 画像を重ねて表示させるときの魚眼レンズ画像の重み。
     overlaid_weight2 : 画像を重ねて表示させるときの顕著性画像の重み。
 
+    return
+    dualFishEyeImage : 元の画像に顕著性画像を重ねた画像のndarray(縦, 横, RGB)
+    time1 : 終了時の時刻
+    dualFishEyeSalMaps : 顕著性画像のndarray(縦, 横, RGB)
+
+
     """
-    equirectanglarImageAs = [setupper.embedA[num].embed(planarImages[num]) for num in range(len(setupper.cpA))]
+    equirectanglarImageAs = [setupper.embedA[num].embed(planarImages[num]) for num in range(len(setupper.cpA))] #顕著性画像を平面から正距円筒図法に変換（A側3枚）
     equirectanglarImageA = np.array(equirectanglarImageAs).max(axis=0)
-    equirectanglarImageBs = [setupper.embedB[num].embed(planarImages[num+3]) for num in range(len(setupper.cpB))]
+    equirectanglarImageBs = [setupper.embedB[num].embed(planarImages[num+3]) for num in range(len(setupper.cpB))]   #顕著性画像を平面から正距円筒図法に変換（B側3枚）
     equirectanglarImageB = np.array(equirectanglarImageBs).max(axis=0)
-    dualFishEyeSalMaps = e2f([equirectanglarImageA, equirectanglarImageB], setupper)
-    dualFishEyeSalMaps = change_salmap_color(dualFishEyeSalMaps, setupper)
-    dualFishEyeImage = cv2.addWeighted(originalDualFishEyeImage, overlaid_weight1, dualFishEyeSalMaps, overlaid_weight2, 0)
+    dualFishEyeSalMaps = e2f([equirectanglarImageA, equirectanglarImageB], setupper)    #顕著性画像を正距円筒図法から魚眼レンズ画像に変換
+    dualFishEyeSalMaps = change_salmap_color(dualFishEyeSalMaps, setupper)  #顕著性画像を白黒からカラーに変換
+    dualFishEyeImage = cv2.addWeighted(originalDualFishEyeImage, overlaid_weight1, dualFishEyeSalMaps, overlaid_weight2, 0) #元画像と顕著性画像を重ねる
     time1 = time.time()
 
     return dualFishEyeImage, time1, dualFishEyeSalMaps
@@ -639,13 +623,10 @@ def inverse_extract_omni_image(planarImages, originalDualFishEyeImage, setupper,
 def change_salmap_color(salMaps, setupper):
     """
     グレースケールの顕著性画像を赤青のヒートマップに変換する。
-    salMaps : グレースケール顕著性画像のndarray。(枚数, 縦, 横)
-    return : 　ヒートマップ化した顕著性画像のndarray(RGB)。(枚数, 縦, 横, 3)
+    salMaps : グレースケール顕著性画像のndarray。(縦, 横)
+    return : 　ヒートマップ化した顕著性画像のndarray(RGB)。(縦, 横, 3)
     """
 
     color_salMaps = cv2.applyColorMap((salMaps).astype(np.uint8), cv2.COLORMAP_JET)
-    color_salMaps[setupper.mask] = [0,0,0]
-    #new_salMaps = np.zeros((salMaps.shape[0], salMaps.shape[1], 3))
-    #new_salMaps[:,:,0][setupper.mask] = salMaps[setupper.mask]
-    #new_salMaps[:,:,2][setupper.mask] = 255-salMaps[setupper.mask]
+    color_salMaps[setupper.mask] = [0,0,0]  #maskに記録してある顕著性マップではない部分は黒に戻す
     return color_salMaps
